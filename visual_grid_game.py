@@ -1,5 +1,6 @@
 import random
 import tkinter as tk
+from agent import SearchAgent
 
 
 class VisualGridHuntGame:
@@ -150,6 +151,10 @@ class VisualGridHuntGame:
             )
 
         return {
+            'agent_pos': tuple(self.agent_pos),
+            'grid_size': (self.width, self.height),
+            'walls': list(self.walls),
+            'all_food': list(self.food_positions),
             'wall_ahead': blocked(forward_cell),
             'wall_left': blocked(left_cell),
             'wall_right': blocked(right_cell),
@@ -172,6 +177,39 @@ class VisualGridHuntGame:
     def execute_action(self, action: str):
 
         self.steps += 1
+
+        if action in ['Up', 'Right', 'Down', 'Left']:
+
+            self.agent_direction = action
+
+            direction_moves = {
+                'Up': (0, 1),
+                'Right': (1, 0),
+                'Down': (0, -1),
+                'Left': (-1, 0)
+            }
+
+            dx, dy = direction_moves[action]
+            new_pos = [
+                self.agent_pos[0] + dx,
+                self.agent_pos[1] + dy
+            ]
+
+            outside_grid = (
+                new_pos[0] < 0
+                or new_pos[0] >= self.width
+                or new_pos[1] < 0
+                or new_pos[1] >= self.height
+            )
+
+            if (
+                outside_grid
+                or tuple(new_pos) in self.walls
+            ):
+                self.score -= 5
+
+            else:
+                self.agent_pos = new_pos
 
         direction_order = [
             'Up',
@@ -543,7 +581,7 @@ class GridGameGUI:
 
 
         #self.agent = SimpleReflexAgent()
-        self.agent = ModelBasedAgent()
+        self.agent = SearchAgent()
 
         max_canvas_dim = 600
 
