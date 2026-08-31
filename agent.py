@@ -1,5 +1,6 @@
 from collections import deque
 import heapq
+import math
 import random
 
 
@@ -50,7 +51,7 @@ class SearchAgent:
 
     def __init__(self):
         self.plan = []
-        self.active_algo = 'BFS'
+        self.active_algo = 'AStar'
         self.moves = [
             ('Up', (0, 1)),
             ('Right', (1, 0)),
@@ -70,6 +71,15 @@ class SearchAgent:
                 and next_state not in walls
             ):
                 yield next_state, action
+
+    def manhattan_distance(self, pos, goal):
+        return abs(pos[0] - goal[0]) + abs(pos[1] - goal[1])
+
+    def euclidean_distance(self, pos, goal):
+        return math.sqrt(
+            (pos[0] - goal[0]) ** 2
+            + (pos[1] - goal[1]) ** 2
+        )
 
     def bfs_search(self, start, goal, walls, grid_size):
         walls = set(walls)
@@ -142,6 +152,68 @@ class SearchAgent:
 
         return None
 
+    def astar_search(
+        self,
+        start_pos,
+        goal_pos,
+        walls,
+        grid_size,
+        heuristic_type='manhattan'
+    ):
+        start_pos = tuple(start_pos)
+        goal_pos = tuple(goal_pos)
+        walls = set(walls)
+
+        if heuristic_type.lower() == 'euclidean':
+            heuristic = self.euclidean_distance
+        else:
+            heuristic = self.manhattan_distance
+
+        start_h = heuristic(start_pos, goal_pos)
+        frontier = []
+        heapq.heappush(frontier, (start_h, 0, start_pos, []))
+        reached_states = set()
+        costs = {start_pos: 0}
+
+        while frontier:
+            f_cost, g_cost, current_pos, path_taken = heapq.heappop(
+                frontier
+            )
+
+            if current_pos in reached_states:
+                continue
+
+            if current_pos == goal_pos:
+                return path_taken
+
+            reached_states.add(current_pos)
+
+            for next_pos, action in self.get_successors(
+                current_pos,
+                walls,
+                grid_size
+            ):
+                if next_pos in reached_states:
+                    continue
+
+                new_g = g_cost + 1
+
+                if new_g < costs.get(next_pos, float('inf')):
+                    costs[next_pos] = new_g
+                    new_h = heuristic(next_pos, goal_pos)
+                    new_f = new_g + new_h
+                    heapq.heappush(
+                        frontier,
+                        (
+                            new_f,
+                            new_g,
+                            next_pos,
+                            path_taken + [action]
+                        )
+                    )
+
+        return None
+
     def sense_and_act(self, percept):
         if not self.plan:
             start = tuple(percept['agent_pos'])
@@ -152,12 +224,16 @@ class SearchAgent:
                 key=lambda food: abs(food[0] - start[0])
                 + abs(food[1] - start[1])
             )
-            searches = {
-                'BFS': self.bfs_search,
-                'DFS': self.dfs_search,
-                'UCS': self.ucs_search
-            }
-            search = searches.get(self.active_algo.upper(), self.bfs_search)
+            if self.active_algo == 'BFS':
+                search = self.bfs_search
+            elif self.active_algo == 'DFS':
+                search = self.dfs_search
+            elif self.active_algo == 'UCS':
+                search = self.ucs_search
+            elif self.active_algo == 'AStar':
+                search = self.astar_search
+            else:
+                search = self.bfs_search
 
             for goal in foods:
                 path = search(start, goal, walls, grid_size)
