@@ -2,6 +2,7 @@ from collections import deque
 import heapq
 import math
 import random
+from logic_engine import KnowledgeBase
 
 
 class GreedyGridAgent:
@@ -52,6 +53,15 @@ class SearchAgent:
     def __init__(self):
         self.plan = []
         self.active_algo = 'AStar'
+        self.kb = KnowledgeBase()
+        self.kb.tell_rule(
+            ['TargetVisible', 'HasDust'],
+            'SafeToEngage'
+        )
+        self.kb.tell_rule(
+            ['SafeToEngage', 'BloodseekerMissing'],
+            'Retreat'
+        )
         self.moves = [
             ('Up', (0, 1)),
             ('Right', (1, 0)),
@@ -158,11 +168,13 @@ class SearchAgent:
         goal_pos,
         walls,
         grid_size,
-        heuristic_type='manhattan'
+        heuristic_type='manhattan',
+        tile_facts=None
     ):
         start_pos = tuple(start_pos)
         goal_pos = tuple(goal_pos)
         walls = set(walls)
+        tile_facts = tile_facts or {}
 
         if heuristic_type.lower() == 'euclidean':
             heuristic = self.euclidean_distance
@@ -193,6 +205,16 @@ class SearchAgent:
                 walls,
                 grid_size
             ):
+                self.kb.clear_facts()
+
+                for fact in tile_facts.get(next_pos, []):
+                    self.kb.tell_fact(fact)
+
+                self.kb.forward_chain()
+
+                if 'Retreat' in self.kb.facts:
+                    continue
+
                 if next_pos in reached_states:
                     continue
 
@@ -236,7 +258,16 @@ class SearchAgent:
                 search = self.bfs_search
 
             for goal in foods:
-                path = search(start, goal, walls, grid_size)
+                if self.active_algo == 'AStar':
+                    path = search(
+                        start,
+                        goal,
+                        walls,
+                        grid_size,
+                        tile_facts=percept.get('tile_facts', {})
+                    )
+                else:
+                    path = search(start, goal, walls, grid_size)
 
                 if path:
                     self.plan = path
